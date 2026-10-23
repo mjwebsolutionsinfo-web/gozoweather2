@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qala Weather Station · Gozo, Malta</title>
+<meta name="description" content="Live hardware and island weather from Qala, Gozo: temperature, wind, pressure, marine waves, UV, Saharan dust, and 12 Gozo & Comino swim shelters.">
+<meta name="theme-color" id="metaThemeColor" content="#1d6fa5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Qala Weather">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231f7fb8'/%3E%3Ccircle cx='26' cy='26' r='11' fill='%23fbbf24'/%3E%3Cpath d='M24 46h22a9 9 0 0 0 1-17.9A12 12 0 0 0 24 26a10 10 0 0 0 0 20z' fill='%23ffffff'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+:root {
+  --bg: #eef4f9;
+  --card: #ffffff;
+  --ink: #10243a;
+  --muted: #546a80;
+  --line: #d5e1ea;
+  --accent: #1f7fb8;
+  --sun: #c77a0a;
+  --rain: #0369a1;
+  --good: #10b981;
+  --warn: #f59e0b;
+  --danger: #e11d48;
+  --hero-top: #1d6fa5;
+  --hero-mid: #3a8fc4;
+  --hero-low: #6bb8df;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a1626;
+  --card: #112238;
+  --ink: #e8f1f8;
+  --muted: #9bb0c3;
+  --line: #223a54;
+  --accent: #5bb8ea;
+  --sun: #f0b44c;
+  --rain: #5bb8ea;
+  color-scheme: dark;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.5 "Plus Jakarta Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  gap: 12px;
+}
+
+.header-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.logo-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  justify-content: center;
+}
+
+.brand-title {
+  font-weight: 700;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--sun);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  white-space: nowrap;
+}
+
+.status-pill.live {
+  background: rgba(16, 185, 129, 0.14);
+  color: var(--good);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.status-pill.live .pulse-dot {
+  background: var(--good);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+  animation: pulse 2s infinite;
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.seg {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.seg button, .ibtn {
+  background: none;
+  border: 0;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ibtn {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.weather-emoji {
+  display: inline-block;
+  user-select: none;
+}
+
+.hero {
+  background: linear-gradient(180deg, var(--hero-top) 0%, var(--hero-mid) 45%, var(--hero-low) 78%, var(--bg) 100%);
+  color: #fff;
+  transition: background 0.8s ease;
+  position: relative;
+}
+
+.hero .wrap {
+  padding-top: 30px;
+  padding-bottom: 24px;
+  display: grid;
+  gap: 20px;
+}
+
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 24, 46, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.hero h1 {
+  margin: 0;
+  font: 600 clamp(72px, 16vw, 128px)/0.92 "Fraunces", Georgia, serif;
+  letter-spacing: -0.04em;
+  display: flex;
+  align-items: flex-start;
+}
+
+.hero h1 small {
+  font-size: 0.38em;
+  font-weight: 500;
+  margin-left: 4px;
+  opacity: 0.92;
+}
+
+.sub {
+  margin: 0;
+  font-size: 14.5px;
+  opacity: 0.95;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.stat {
+  background: rgba(7, 20, 36, 0.38);
+  border-radius: 14px;
+  padding: 12px 14px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.stat span {
+  display: block;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+.stat b {
+  font-size: 21px;
+  font-weight: 700;
+  display: block;
+  margin-top: 2px;
+}
+
+.stat .sub-note {
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 3px;
+  display: block;
+}
+
+section {
+  padding: 24px 0 0;
+}
+
+h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.g3 {
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.chart-container {
+  position: relative;
+  width: 100%;
+  height: 250px;
+  max-height: 250px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.facts div {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.facts b {
+  display: block;
+  font-size: 16px;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+.compass {
+  display: block;
+  margin: 0 auto;
+  width: 175px;
+  height: 175px;
+}
+
+.big {
+  font: 600 36px/1.1 "Fraunces", Georgia, serif;
+}
+
+.lbl {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 8px;
+  background: var(--line);
+  overflow: hidden;
+  margin: 8px 0 4px;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 8px;
+  transition: width 0.5s;
+}
+
+.days-wrapper {
+  width: 100%;
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.days-track {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.day-card {
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.day-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.day-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  background: rgba(31, 127, 184, 0.08);
+}
+
+.day-card b { display: block; font-size: 13.5px; }
+.day-card .date-sub { display: block; font-size: 11px; color: var(--muted); }
+.day-card .ic { font-size: 26px; margin: 6px 0; display: block; }
+.day-card .hi { display: block; font-weight: 700; font-size: 15px; }
+.day-card .lo { display: block; font-size: 12px; color: var(--muted); }
+.day-card .rn { font-size: 11.5px; display: block; color: var(--rain); font-weight: 600; margin-top: 3px; }
+
+@media (max-width: 768px) {
+  .days-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-left: -16px;
+    margin-right: -16px;
+    width: calc(100% + 32px);
+    padding: 6px 16px;
+  }
+  .days-wrapper::-webkit-scrollbar { display: none; }
+  .days-track { display: flex; width: max-content; gap: 10px; }
+  .day-card { flex: 0 0 96px; width: 96px; }
+}
+
+.shelter-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.shelter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.bay-box {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bay-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.bay-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.bay-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.bay-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  margin-top: 4px;
+}
+
+.badge-green { background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-amber { background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-red { background: rgba(225, 29, 72, 0.15); color: #e11d48; border: 1px solid rgba(225, 29, 72, 0.3); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 38, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 650px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.close-btn:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+footer {
+  text-align: center;
+  padding: 40px 0;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="header-brand-wrap">
+      <img src="logo.jpg" alt="Qala Weather Logo" class="logo-img" onerror="this.style.display='none'">
+      <div class="brand-text">
+        <span class="brand-title">Qala Weather Station</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="statusPill" class="status-pill">
+        <span class="pulse-dot"></span>
+        <span id="statusText">Checking station…</span>
+      </div>
+      <div class="seg" role="group" aria-label="Units">
+        <button id="unitC" aria-pressed="true" onclick="setUnit('C')">°C</button>
+        <button id="unitF" aria-pressed="false" onclick="setUnit('F')">°F</button>
+      </div>
+      <button class="ibtn" onclick="refreshAll()" title="Refresh all data">↻</button>
+      <button class="ibtn" onclick="toggleTheme()" id="themeBtn" title="Toggle Theme">🌙</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <div class="hero-tag">
+        <span>📍 II-Qala, Ghawdex</span>
+        <span>•</span>
+        <span>Alt: 84 m</span>
+        <span>•</span>
+        <span id="heroTime">--:--</span>
+      </div>
+      <div class="hero-main">
+        <div class="weather-emoji" id="heroEmoji">⏳</div>
+        <div>
+          <h1><span id="tempVal">--</span><small id="unitSymbol">°C</small></h1>
+          <div class="cond" id="condText">Waiting for data…</div>
+          <div class="sub" id="feelsText">Connecting to station…</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span>Wind & Gusts</span>
+          <b id="windVal">--</b>
+          <span class="sub-note" id="windSub">--</span>
+        </div>
+        <div class="stat">
+          <span>Humidity</span>
+          <b id="humVal">--</b>
+          <span class="sub-note">Relative humidity</span>
+        </div>
+        <div class="stat">
+          <span>Precipitation</span>
+          <b id="rainVal">--</b>
+          <span class="sub-note">Accumulated precipitation</span>
+        </div>
+        <div class="stat">
+          <span>Solar & UV</span>
+          <b id="uvVal">--</b>
+          <span class="sub-note">Index rating</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap" style="display:grid; gap:28px; padding-top:24px;">
+
+    <!-- 7-Day Forecast Section -->
+    <section>
+      <h2>7-Day Island Forecast <span style="font-size:13px; font-weight:500; color:var(--muted)">Tap day for details</span></h2>
+      <div class="days-wrapper">
+        <div class="days-track" id="daysTrack">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 24-Hour Timeline & Solar Cycle -->
+    <section>
+      <h2>⏱️ 24-Hour Timeline & Solar Cycle</h2>
+      <div class="card grid">
+        <div class="chart-container">
+          <canvas id="timelineChart"></canvas>
+        </div>
+        <div class="facts">
+          <div>Civil Dawn<b id="sunDawn">--:--</b></div>
+          <div>Sunrise<b id="sunRise">--:--</b></div>
+          <div>Solar Noon<b id="sunNoon">--:--</b></div>
+          <div>Sunset<b id="sunSet">--:--</b></div>
+          <div>Daylight Duration<b id="dayDur">--</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hardware Instruments & Marine Conditions -->
+    <section>
+      <h2>🧭 Hardware Instruments & Marine Conditions</h2>
+      <div class="grid g3">
+        <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <span class="lbl">Wind Direction & Origin</span>
+            <div style="margin-top:12px;">
+              <svg class="compass" viewBox="0 0 200 200">
+                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--line)" stroke-width="2"/>
+                <circle cx="100" cy="100" r="70" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+                <text x="100" y="22" font-size="12" font-weight="700" fill="var(--muted)" text-anchor="middle">N</text>
+                <text x="178" y="104" font-size="12" font-weight="700" fill="var(--muted)" text-anchor="middle">E</text>
+                <text x="100" y="186" font-size="12" font-weight="700" fill="var(--muted)" text-anchor="middle">S</text>
+                <text x="22" y="104" font-size="12" font-weight="700" fill="var(--muted)" text-anchor="middle">W</text>
+                <g id="compassNeedle" transform="rotate(0 100 100)" style="transition: transform 1s ease;">
+                  <polygon points="100,35 108,100 100,90" fill="#e11d48"/>
+                  <polygon points="100,165 108,100 100,110" fill="var(--muted)"/>
+                  <circle cx="100" cy="100" r="6" fill="var(--ink)"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div style="text-align:center; margin-top:12px;">
+            <b class="big" id="windSpeedBig">--</b>
+            <div class="lbl" id="windDirDesc">--</div>
+          </div>
+        </div>
+
+        <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <span class="lbl">Barometric Pressure (MSL)</span>
+            <div class="big" style="margin-top:10px;" id="presVal">--</div>
+            <div class="lbl" id="presTend">--</div>
+          </div>
+          <div>
+            <span class="lbl">Relative Humidity</span>
+            <div class="bar"><i id="humBar" style="width:0%"></i></div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:4px;">
+              <span>0% Dry</span>
+              <span id="humBarText">-- relative humidity</span>
+              <span>100% Humid</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <span class="lbl">Gozo Channel Marine State</span>
+            <div class="big" style="margin-top:10px;" id="waveVal">--</div>
+            <div class="lbl" id="waveDesc">--</div>
+          </div>
+          <div class="facts" style="margin-top:16px;">
+            <div>Wave Period<b id="wavePer">--</b></div>
+            <div>Sea Temperature<b id="seaTemp">--</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gozo & Comino Swim Shelters Evaluator -->
+    <section>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2>🏖️ Gozo & Comino Swim Shelters <span style="font-size:13px; font-weight:500; color:var(--muted)">East Gozo Focus</span></h2>
+        <button style="background:var(--accent); color:#fff; border:0; padding:6px 14px; border-radius:10px; font-weight:600; font-size:13px;" onclick="openModal('allBaysModal')">View All 12 Bays</button>
+      </div>
+      <div class="shelter-card">
+        <p id="bayIntro" style="margin:0 0 12px; font-size:13.5px; color:var(--muted);">Loading wind data…</p>
+        <div class="shelter-grid" id="localBaysGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Sky, Solar & Saharan Dust (Trab) Telemetry -->
+    <section>
+      <h2>☀️ Sky, Solar & Saharan Dust (Trab) Telemetry</h2>
+      <div class="card">
+        <div class="shelter-grid" style="margin-top:0;">
+          <div class="bay-box">
+            <span class="lbl">SOLAR IRRADIANCE</span>
+            <b class="big" id="solarVal">--</b>
+            <span class="lbl">Shortwave radiation</span>
+          </div>
+          <div class="bay-box">
+            <span class="lbl">CLOUD COVER</span>
+            <b class="big" id="cloudVal">--</b>
+            <span class="lbl">Total sky dome</span>
+          </div>
+          <div class="bay-box">
+            <span class="lbl">VISIBILITY</span>
+            <b class="big" id="visVal">--</b>
+            <span class="lbl">Channel horizon</span>
+          </div>
+          <div class="bay-box">
+            <span class="lbl">SAHARAN DUST (TRAB)</span>
+            <b class="big" id="dustVal">--</b>
+            <span class="lbl">Airborne desert dust</span>
+          </div>
+          <div class="bay-box">
+            <span class="lbl">EUROPEAN AQI</span>
+            <b class="big" id="aqiVal">--</b>
+            <span class="lbl">Air quality index</span>
+          </div>
+          <div class="bay-box">
+            <span class="lbl">DATA SOURCE</span>
+            <b style="font-size:15px; margin-top:2px;" id="sourceVal">Qala Station (IQALA3)</b>
+            <span class="lbl" id="sourceSub">Connecting…</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    Qala Weather Station (IQALA3) • Qala, Gozo, Malta • Live station data from Weather Underground • Forecast, marine & air quality from Open-Meteo
+  </div>
+</footer>
+
+<!-- Modal for All 12 Bays -->
+<div class="modal-overlay" id="allBaysModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">All 12 Gozo & Comino Swim Shelters</h3>
+      <button class="close-btn" onclick="closeModal('allBaysModal')">&times;</button>
+    </div>
+    <p style="font-size:13.5px; color:var(--muted); margin-top:0;">Comprehensive live assessment of all major swimming bays across Gozo and Comino relative to current wind and swell direction.</p>
+    <div class="shelter-grid" id="allBaysGrid" style="margin-top:16px;">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+// ====================== STATE ======================
+let currentUnit = 'C';
+let timelineChartInstance = null;
+let stationState = null;   // response from /.netlify/functions/station
+let islandState = null;    // response from /.netlify/functions/island
+let selectedDay = 0;
+
+const $ = (id) => document.getElementById(id);
+const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+const isNum = (v) => v !== null && v !== undefined && v !== '' && !isNaN(Number(v));
+const num = (v, d = 1) => (isNum(v) ? Number(v).toFixed(d) : '--');
+const toU = (c) => (currentUnit === 'F' ? c * 9 / 5 + 32 : c);
+const tmp = (c, d = 1) => (isNum(c) ? toU(Number(c)).toFixed(d) : '--');
+const TZ = 'Europe/Malta';
+const clock = (ms) => new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).format(ms);
+
+// ====================== LOOKUPS ======================
+const WIND_NAMES = [
+  ['N', 'Tramuntana', 'North'], ['NE', 'Grigal', 'North-East'], ['E', 'Lvant', 'East'], ['SE', 'Xlokk', 'South-East'],
+  ['S', 'Nofsinhar', 'South'], ['SW', 'Lbiċ', 'South-West'], ['W', 'Punent', 'West'], ['NW', 'Majjistral', 'North-West']
+];
+const windInfo = (deg) => {
+  const [abbr, mt, en] = WIND_NAMES[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+  return { abbr, mt, en };
+};
+
+function wmo(code, isDay = 1) {
+  if (code === 0) return isDay ? ['☀️', 'Clear sky'] : ['🌙', 'Clear night'];
+  if (code === 1) return isDay ? ['🌤️', 'Mainly clear'] : ['🌙', 'Mainly clear'];
+  if (code === 2) return ['⛅', 'Partly cloudy'];
+  if (code === 3) return ['☁️', 'Overcast'];
+  if (code === 45 || code === 48) return ['🌫️', 'Fog'];
+  if (code >= 51 && code <= 57) return ['🌦️', 'Drizzle'];
+  if (code >= 61 && code <= 67) return ['🌧️', 'Rain'];
+  if (code >= 71 && code <= 77) return ['❄️', 'Snow'];
+  if (code >= 80 && code <= 82) return ['🌦️', 'Rain showers'];
+  if (code >= 85 && code <= 86) return ['🌨️', 'Snow showers'];
+  if (code >= 95) return ['⛈️', 'Thunderstorm'];
+  return ['⛅', 'Mixed conditions'];
+}
+
+function seaState(h) {
+  if (!isNum(h)) return '--';
+  if (h < 0.1) return 'Calm (glassy)';
+  if (h < 0.5) return 'Smooth sea state';
+  if (h < 1.25) return 'Slight sea state';
+  if (h < 2.5) return 'Moderate sea state';
+  if (h < 4) return 'Rough sea state';
+  return 'Very rough sea state';
+}
+
+function aqiLabel(a) {
+  if (!isNum(a)) return 'Air quality index';
+  if (a <= 20) return 'Good';
+  if (a <= 40) return 'Fair';
+  if (a <= 60) return 'Moderate';
+  if (a <= 80) return 'Poor';
+  if (a <= 100) return 'Very poor';
+  return 'Extremely poor';
+}
+
+// ====================== BAYS ======================
+// facing = compass direction the bay opens toward (wind FROM this side blows into the bay)
+// half   = how wide the exposure window is (+/- degrees). Narrow gorges/inlets = small number.
+// NOTE: orientations are best-effort estimates - tweak any bay here if you know it better.
+const BAYS = [
+  { name: 'Hondoq ir-Rummien', loc: 'Qala (East Gozo)',        facing: 90,  half: 55 },
+  { name: 'San Blas Bay',      loc: 'Nadur (NE Gozo)',         facing: 30,  half: 60 },
+  { name: 'Ramla l-Hamra',     loc: 'Xaghra (North Gozo)',     facing: 0,   half: 70 },
+  { name: 'Marsalforn Bay',    loc: 'Marsalforn (North Gozo)', facing: 355, half: 50 },
+  { name: 'Wied il-Għasri',    loc: 'Għasri (North Gorge)',    facing: 350, half: 25 },
+  { name: 'Xwieni Bay',        loc: 'Marsalforn Coast',        facing: 5,   half: 65 },
+  { name: 'Dwejra Inland Sea', loc: 'San Lawrenz (West)',      facing: 280, half: 20 },
+  { name: 'Xlendi Bay',        loc: 'Munxar (South-West Gozo)',facing: 210, half: 40 },
+  { name: 'Mgarr ix-Xini',     loc: 'Għajnsielem (South Gozo)',facing: 160, half: 40 },
+  { name: 'San Niklaw Bay',    loc: 'Comino Island',           facing: 20,  half: 30 },
+  { name: 'Santa Marija Bay',  loc: 'Comino Island',           facing: 350, half: 60 },
+  { name: 'Blue Lagoon',       loc: 'Comino Island',           facing: 300, half: 30 }
+];
+
+function currentWind() {
+  const s = stationState;
+  if (s && s.success && s.readings && isNum(s.readings.wind_direction) && isNum(s.readings.wind_speed)) {
+    return { dir: Number(s.readings.wind_direction), speed: Number(s.readings.wind_speed), source: 'your station' };
+  }
+  const c = islandState && islandState.current;
+  if (c && isNum(c.wind_direction_10m) && isNum(c.wind_speed_10m)) {
+    return { dir: Number(c.wind_direction_10m), speed: Number(c.wind_speed_10m), source: 'forecast model (station offline)' };
+  }
+  return null;
+}
+
+function evalBay(b, w, wave) {
+  if (!w) return { cls: 'badge-amber', text: '… Waiting for wind data', reason: 'No wind reading available yet.' };
+  const diff = Math.abs((((w.dir - b.facing) % 360) + 540) % 360 - 180);
+  const wi = windInfo(w.dir);
+  const exposed = diff <= b.half;
+  const rough = (isNum(wave) ? wave : 0);
+  if (!exposed) {
+    return { cls: 'badge-green', text: '🟢 Sheltered & Calm',
+      reason: `${wi.mt} (${wi.abbr}) wind at ${num(w.speed, 0)} km/h blows away from or is blocked by land at this bay.` };
+  }
+  if (w.speed >= 25 || rough >= 1.2) {
+    return { cls: 'badge-red', text: '🔴 Rough / Not advised',
+      reason: `${wi.mt} (${wi.abbr}) wind ${num(w.speed, 0)} km/h blows straight into this bay${isNum(wave) ? `, seas ${num(wave)} m` : ''}.` };
+  }
+  if (w.speed >= 10 || rough >= 0.5) {
+    return { cls: 'badge-amber', text: '⚠️ Exposed / Choppy',
+      reason: `${wi.mt} (${wi.abbr}) wind ${num(w.speed, 0)} km/h pushes into this bay${isNum(wave) ? `, seas ${num(wave)} m` : ''}.` };
+  }
+  return { cls: 'badge-green', text: '🟢 Calm (light wind)',
+    reason: `Exposed to ${wi.abbr} wind, but only ${num(w.speed, 0)} km/h right now.` };
+}
+
+function renderBays() {
+  const w = currentWind();
+  const wave = islandState && islandState.marine ? islandState.marine.wave_height : null;
+  const html = (b) => {
+    const e = evalBay(b, w, wave);
+    return `
+    <div class="bay-box">
+      <div class="bay-head">
+        <div class="bay-title">${b.name}</div>
+        <div class="bay-sub">${b.loc}</div>
+      </div>
+      <div>
+        <span class="bay-badge ${e.cls}">${e.text}</span>
+        <div class="bay-sub" style="margin-top:6px;">${e.reason}</div>
+      </div>
+    </div>`;
+  };
+  $('localBaysGrid').innerHTML = BAYS.slice(0, 4).map(html).join('');
+  $('allBaysGrid').innerHTML = BAYS.map(html).join('');
+  const intro = $('bayIntro');
+  if (intro) {
+    intro.textContent = w
+      ? `Live shelter evaluation using ${windInfo(w.dir).mt} (${windInfo(w.dir).abbr}) wind from ${w.dir}° at ${num(w.speed, 0)} km/h — source: ${w.source}.`
+      : 'Waiting for wind data…';
+  }
+}
+
+// ====================== FORECAST ======================
+function dayLabel(dateStr, i) {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  return {
+    day: i === 0 ? 'Today' : d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }),
+    date: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  };
+}
+
+function renderDays() {
+  const track = $('daysTrack');
+  if (!track) return;
+  const days = (islandState && islandState.daily) || [];
+  if (!days.length) {
+    track.innerHTML = '<div style="padding:16px; color:var(--muted); font-size:13.5px;">Forecast unavailable right now.</div>';
+    setText('dayDetail', '');
+    return;
+  }
+  track.innerHTML = days.map((d, i) => {
+    const l = dayLabel(d.date, i);
+    return `
+    <div class="day-card ${i === selectedDay ? 'selected' : ''}" onclick="selectDay(${i})" style="cursor:pointer">
+      <b>${l.day}</b>
+      <span class="date-sub">${l.date}</span>
+      <span class="ic">${wmo(d.code)[0]}</span>
+      <span class="hi">${tmp(d.hi, 0)}°</span>
+      <span class="lo">${tmp(d.lo, 0)}°</span>
+      <span class="rn">${num(d.rain, 1)} mm</span>
+    </div>`;
+  }).join('');
+  renderDayDetail();
+}
+
+function renderDayDetail() {
+  let el = $('dayDetail');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'dayDetail';
+    el.style.cssText = 'margin-top:12px; font-size:13.5px; color:var(--muted);';
+    $('daysTrack').parentElement.insertAdjacentElement('afterend', el);
+  }
+  const d = islandState && islandState.daily && islandState.daily[selectedDay];
+  if (!d) { el.textContent = ''; return; }
+  const wi = windInfo(d.wind_dir);
+  el.innerHTML = `<b style="color:var(--ink)">${wmo(d.code)[1]}</b> · Rain chance ${num(d.rain_prob, 0)}% · ` +
+    `Wind up to ${num(d.wind_max, 0)} km/h (gusts ${num(d.gust_max, 0)}) from ${wi.mt} (${wi.abbr}) · UV max ${num(d.uv_max, 1)}`;
+}
+
+function selectDay(i) { selectedDay = i; renderDays(); }
+
+// ====================== CHART (real last 24 h from your station) ======================
+function renderChart() {
+  const canvas = $('timelineChart');
+  if (!canvas) return;
+  const hist = (stationState && stationState.history) || [];
+  if (timelineChartInstance) timelineChartInstance.destroy();
+
+  let note = $('chartNote');
+  if (!note) {
+    note = document.createElement('div');
+    note.id = 'chartNote';
+    note.style.cssText = 'font-size:12.5px; color:var(--muted); margin-top:6px;';
+    canvas.parentElement.insertAdjacentElement('afterend', note);
+  }
+  note.textContent = hist.length ? `Real hourly average temperature from IQALA3 — last ${hist.length} hours.` : 'No history available from the station yet.';
+
+  timelineChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: hist.map((h) => clock(h.t)),
+      datasets: [{
+        label: `Temperature (°${currentUnit})`,
+        data: hist.map((h) => Number(tmp(h.temp, 1))),
+        borderColor: '#1f7fb8', backgroundColor: 'rgba(31,127,184,0.1)',
+        borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, maxTicksLimit: 8 } }
+      }
+    }
+  });
+}
+
+// ====================== RENDER: STATION ======================
+function renderStation() {
+  const s = stationState;
+  const pill = $('statusPill');
+  const online = !!(s && s.success && s.readings);
+  const r = online ? s.readings : {};
+
+  if (pill) pill.className = online ? 'status-pill live' : 'status-pill';
+  setText('statusText', s ? (online ? 'Hardware Live (IQALA3)' : 'Offline · Station standby') : 'Checking station…');
+
+  // hero values come only from the hardware; offline => dashes
+  setText('tempVal', tmp(r.temperature));
+  setText('unitSymbol', `°${currentUnit}`);
+  setText('windVal', online ? `${num(r.wind_speed)} km/h` : '--');
+  setText('windSpeedBig', online ? `${num(r.wind_speed)} km/h` : '--');
+  if (online && isNum(r.wind_direction)) {
+    const wi = windInfo(r.wind_direction);
+    setText('windSub', `${wi.mt} (${wi.abbr}) • Gusts ${num(r.wind_gust)} km/h`);
+    $('windDirDesc').innerHTML = `Rih: ${wi.mt}<br>From ${Math.round(r.wind_direction)}° ${wi.abbr} (${wi.en})`;
+    $('compassNeedle').setAttribute('transform', `rotate(${r.wind_direction} 100 100)`);
+  } else {
+    setText('windSub', 'No live wind data');
+    $('windDirDesc').innerHTML = 'Station offline';
+  }
+  setText('humVal', online ? `${num(r.humidity, 0)}%` : '--');
+  $('humBar').style.width = online && isNum(r.humidity) ? `${r.humidity}%` : '0%';
+  setText('humBarText', online ? `${num(r.humidity, 0)}% relative humidity` : '-- relative humidity');
+  setText('rainVal', online ? `${num(r.precipitation, 1)} mm` : '--');
+  setText('uvVal', online ? num(r.uv_index) : '--');
+  setText('presVal', online ? `${num(r.pressure_msl)} hPa` : '--');
+  setText('solarVal', online && isNum(r.solar_radiation) ? `${num(r.solar_radiation, 0)} W/m²` : '--');
+
+  // pressure tendency
+  if (online && isNum(r.pressure_change_3h)) {
+    const c = Number(r.pressure_change_3h);
+    const word = Math.abs(c) < 1 ? 'Steady' : c > 0 ? (c > 3 ? 'Rising rapidly' : 'Rising') : (c < -3 ? 'Falling rapidly' : 'Falling');
+    setText('presTend', `${word} (${c > 0 ? '+' : ''}${c.toFixed(1)} hPa / 3 h)`);
+  } else {
+    setText('presTend', online ? 'Trend unavailable' : 'Station offline');
+  }
+
+  // feels-like line
+  if (online) {
+    const t = clock(new Date(s.lastUpdated));
+    setText('feelsText', `Feels like ${tmp(r.feels_like)}°${currentUnit} • Dew point ${tmp(r.dew_point)}°${currentUnit} • Updated ${t}`);
+    setText('sourceSub', `Weather Underground · updated ${t}`);
+  } else if (s) {
+    setText('feelsText', s.lastUpdated ? `Station offline — last report ${clock(new Date(s.lastUpdated))} (${s.reason})` : `Station offline — ${s.reason}`);
+    setText('sourceSub', s.reason || 'No live packet');
+  }
+  setText('sourceVal', 'Qala Station (IQALA3)');
+
+  renderChart();
+  renderBays();
+  renderHeroSky();
+}
+
+// ====================== RENDER: ISLAND / MODEL DATA ======================
+function renderHeroSky() {
+  const c = islandState && islandState.current;
+  if (c) {
+    const [emoji, label] = wmo(c.weather_code, c.is_day);
+    setText('heroEmoji', emoji);
+    setText('condText', label);
+  } else {
+    setText('heroEmoji', '⏳');
+    setText('condText', stationState && stationState.success ? 'Live station data' : 'Waiting for data…');
+  }
+}
+
+function renderIsland() {
+  const d = islandState;
+  if (!d) return;
+
+  // sun
+  if (d.sun) {
+    setText('sunDawn', d.sun.dawn); setText('sunRise', d.sun.sunrise); setText('sunNoon', d.sun.noon);
+    setText('sunSet', d.sun.sunset); setText('dayDur', d.sun.daylight);
+  }
+  // marine
+  const m = d.marine || {};
+  setText('waveVal', isNum(m.wave_height) ? `${num(m.wave_height)} m` : '--');
+  setText('waveDesc', seaState(m.wave_height));
+  setText('wavePer', isNum(m.wave_period) ? `${num(m.wave_period)} s` : '--');
+  setText('seaTemp', isNum(m.sea_surface_temperature) ? `${tmp(m.sea_surface_temperature)}°${currentUnit}` : '--');
+  // sky
+  const c = d.current || {};
+  setText('cloudVal', isNum(c.cloud_cover) ? `${num(c.cloud_cover, 0)}%` : '--');
+  setText('visVal', isNum(c.visibility) ? `${(c.visibility / 1000).toFixed(0)} km` : '--');
+  const a = d.air || {};
+  setText('dustVal', isNum(a.dust) ? `${num(a.dust, 0)} µg/m³` : '--');
+  setText('aqiVal', isNum(a.european_aqi) ? `${num(a.european_aqi, 0)} · ${aqiLabel(a.european_aqi)}` : '--');
+
+  renderDays();
+  renderHeroSky();
+  renderBays();
+}
+
+// ====================== FETCHING ======================
+async function fetchStationData() {
+  try {
+    const res = await fetch('/.netlify/functions/station', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Station function returned HTTP ' + res.status);
+    stationState = await res.json();
+  } catch (err) {
+    console.warn('Station fetch failed:', err.message);
+    stationState = { success: false, reason: err.message, history: (stationState && stationState.history) || [] };
+  }
+  renderStation();
+}
+
+async function fetchIslandData() {
+  try {
+    const res = await fetch('/.netlify/functions/island');
+    if (!res.ok) throw new Error('Island function returned HTTP ' + res.status);
+    islandState = await res.json();
+    if (islandState.errors && islandState.errors.length) console.warn('Island data issues:', islandState.errors);
+  } catch (err) {
+    console.warn('Island fetch failed:', err.message);
+  }
+  renderIsland();
+}
+
+function refreshAll() { fetchStationData(); fetchIslandData(); }
+
+// ====================== UI ======================
+function setUnit(u) {
+  currentUnit = u;
+  $('unitC').setAttribute('aria-pressed', u === 'C');
+  $('unitF').setAttribute('aria-pressed', u === 'F');
+  renderStation();
+  renderIsland();
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark';
+  root.setAttribute('data-theme', isDark ? '' : 'dark');
+  $('themeBtn').textContent = isDark ? '🌙' : '☀️';
+}
+
+function openModal(id) { $(id).classList.add('open'); }
+function closeModal(id) { $(id).classList.remove('open'); }
+
+function tickClock() {
+  const now = new Date();
+  const zone = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, timeZoneName: 'short' })
+    .formatToParts(now).find((p) => p.type === 'timeZoneName');
+  setText('heroTime', `${clock(now)} ${zone ? zone.value : ''}`);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  tickClock();
+  setInterval(tickClock, 30000);
+  renderDays();
+  renderChart();
+  renderBays();
+  refreshAll();
+  setInterval(fetchStationData, 60000);     // station: every minute
+  setInterval(fetchIslandData, 600000);     // forecast/marine/air: every 10 minutes
+});
+</script>
+
+</body>
+</html>
